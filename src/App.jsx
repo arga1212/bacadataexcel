@@ -132,7 +132,7 @@ export default function TaxCoreDashboard() {
                 </svg>
               </div>
               <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.03em' }}>Bacadata</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 5, padding: '1px 7px', letterSpacing: '.05em' }}>v1.0</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 5, padding: '1px 7px', letterSpacing: '.05em' }}>JIS</span>
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
