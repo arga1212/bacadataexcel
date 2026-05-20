@@ -35,8 +35,10 @@ const toIDR = (n) =>
   new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n || 0);
 const toIDRShort = (n) => {
   if (!n) return 'Rp 0';
-  if (n >= 1_000_000_000) return `Rp ${(n / 1_000_000_000).toFixed(2)}M`;
-  if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}jt`;
+  const abs = Math.abs(n);
+  const sign = n < 0 ? '-' : '';
+  if (abs >= 1_000_000_000) return `${sign}Rp ${(abs / 1_000_000_000).toFixed(2)}M`;
+  if (abs >= 1_000_000) return `${sign}Rp ${(abs / 1_000_000).toFixed(1)}jt`;
   return toIDR(n);
 };
 
@@ -102,11 +104,13 @@ export default function TaxCoreDashboard() {
       item.user.toLowerCase().includes(searchTerm.toLowerCase())
     ), [filterPIC, filterBulan, rawData, searchTerm]);
 
-  const total = useMemo(() =>
-    filteredData.reduce(
+  const total = useMemo(() => {
+    const t = filteredData.reduce(
       (acc, cur) => ({ fktK: acc.fktK+cur.fktK, fktM: acc.fktM+cur.fktM, ppnK: acc.ppnK+cur.ppnK, ppnM: acc.ppnM+cur.ppnM }),
       { fktK: 0, fktM: 0, ppnK: 0, ppnM: 0 }
-    ), [filteredData]);
+    );
+    return { ...t, selisih: t.ppnK - t.ppnM };
+  }, [filteredData]);
 
   const px = isMobile ? '16px' : isTablet ? '28px' : '48px';
 
@@ -114,7 +118,8 @@ export default function TaxCoreDashboard() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap');
-        html,body,#root{margin:0;padding:0;min-height:100vh}
+        html,body{margin:0!important;padding:0!important;width:100%!important;max-width:none!important}
+        #root,#app,[data-reactroot]{width:100%!important;max-width:none!important;margin:0!important;padding:0!important}
         *{box-sizing:border-box}
         .tc-row:hover td{background:#f0f6ff!important}
         .tc-card{transition:transform .2s cubic-bezier(.34,1.56,.64,1),box-shadow .2s}
@@ -132,7 +137,7 @@ export default function TaxCoreDashboard() {
         .tc-drop-zone:hover{border-color:#93c5fd!important;background:#f8fbff!important}
       `}</style>
 
-      <div style={{ minHeight:'100vh', background:'#f1f5f9', fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif", color:'#0f172a' }}>
+      <div style={{ position:'fixed', inset:0, overflowY:'auto', background:'#f1f5f9', fontFamily:"'Plus Jakarta Sans',system-ui,sans-serif", color:'#0f172a', zIndex:0 }}>
 
         {/* ══ NAV ══ */}
         <header style={{ background:'#fff', borderBottom:'1px solid #e2e8f0', position:'sticky', top:0, zIndex:30, boxShadow:'0 1px 0 #e2e8f0' }}>
@@ -148,7 +153,7 @@ export default function TaxCoreDashboard() {
                 </svg>
               </div>
               <div>
-                <span style={{ fontSize:15, fontWeight:800, letterSpacing:'-0.03em', lineHeight:1 }}>Baca Data</span>
+                <span style={{ fontSize:15, fontWeight:800, letterSpacing:'-0.03em', lineHeight:1 }}>TaxCore</span>
                 {rawData.length > 0 && (
                   <span style={{ marginLeft:8, fontSize:11, fontWeight:600, color:'#94a3b8', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:5, padding:'1px 7px', letterSpacing:'.04em', verticalAlign:'middle' }}>
                     {rawData.length} baris
@@ -209,11 +214,10 @@ export default function TaxCoreDashboard() {
           ) : (<>
 
             {/* ── STAT CARDS ── */}
-            <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: isMobile ? 10 : 16, marginBottom:28 }}>
+            <div style={{ display:'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: isMobile ? 10 : 16, marginBottom:28 }}>
               {STATS.map(({ key, label, short, Icon, color, dark, bg, border }) => (
                 <div key={key} className="tc-card"
                   style={{ background:bg, border:`1px solid ${border}`, borderRadius:16, padding: isMobile ? '14px 14px 16px' : '18px 20px 20px', boxShadow:'0 2px 8px rgba(0,0,0,.05)', position:'relative', overflow:'hidden' }}>
-                  {/* decorative circle */}
                   <div style={{ position:'absolute', right:-16, top:-16, width:72, height:72, borderRadius:'50%', background:`${color}18` }}/>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, position:'relative' }}>
                     <span style={{ fontSize:10, fontWeight:800, color:dark, textTransform:'uppercase', letterSpacing:'.07em', opacity:.7 }}>{isMobile ? short : label}</span>
@@ -226,6 +230,36 @@ export default function TaxCoreDashboard() {
                   </p>
                 </div>
               ))}
+
+              {/* Selisih PPN card */}
+              {(() => {
+                const s = total.selisih;
+                const kurangBayar = s > 0;
+                const color  = kurangBayar ? '#dc2626' : '#059669';
+                const dark   = kurangBayar ? '#991b1b' : '#065f46';
+                const bg     = kurangBayar ? 'linear-gradient(135deg,#fef2f2,#fecaca)' : 'linear-gradient(135deg,#ecfdf5,#a7f3d0)';
+                const border = kurangBayar ? '#fca5a5' : '#6ee7b7';
+                const label  = kurangBayar ? 'Kurang Bayar' : s < 0 ? 'Lebih Bayar' : 'Selisih PPN';
+                const Icon   = kurangBayar ? ArrowUpRight : ArrowDownRight;
+                return (
+                  <div className="tc-card"
+                    style={{ background:bg, border:`1px solid ${border}`, borderRadius:16, padding: isMobile ? '14px 14px 16px' : '18px 20px 20px', boxShadow:'0 2px 8px rgba(0,0,0,.05)', position:'relative', overflow:'hidden', gridColumn: isMobile ? 'span 2' : 'auto' }}>
+                    <div style={{ position:'absolute', right:-16, top:-16, width:72, height:72, borderRadius:'50%', background:`${color}18` }}/>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14, position:'relative' }}>
+                      <span style={{ fontSize:10, fontWeight:800, color:dark, textTransform:'uppercase', letterSpacing:'.07em', opacity:.7 }}>{label}</span>
+                      <div style={{ width:30, height:30, borderRadius:8, background:'rgba(255,255,255,.7)', display:'flex', alignItems:'center', justifyContent:'center', color }}>
+                        <Icon size={14} strokeWidth={2.5}/>
+                      </div>
+                    </div>
+                    <p style={{ margin:'0 0 4px', fontSize: isMobile ? 14 : 20, fontWeight:800, color:dark, letterSpacing:'-0.03em', fontVariantNumeric:'tabular-nums', position:'relative' }}>
+                      {isMobile ? toIDRShort(Math.abs(s)) : toIDR(Math.abs(s))}
+                    </p>
+                    <p style={{ margin:0, fontSize:10, fontWeight:700, color:dark, opacity:.6, position:'relative' }}>
+                      {kurangBayar ? 'PPN Keluaran lebih besar' : s < 0 ? 'PPN Masukan lebih besar' : 'Seimbang'}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ── TOOLBAR ── */}
@@ -322,14 +356,18 @@ export default function TaxCoreDashboard() {
                     <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
                       <thead>
                         <tr style={{ borderBottom:'2px solid #f1f5f9' }}>
-                          <Th left sticky>Tanggal</Th>
+                          <Th left>Tanggal</Th>
                           <Th left>User / Customer</Th>
                           {STATS.map(s => <Th key={s.key} right accent={s.color}>{s.label}</Th>)}
+                          <Th right accent="#64748b">Selisih PPN</Th>
                           <Th center>PIC</Th>
                         </tr>
                       </thead>
                       <tbody>
-                        {filteredData.map((row, i) => (
+                        {filteredData.map((row, i) => {
+                          const selisih = row.ppnK - row.ppnM;
+                          const kurang = selisih > 0;
+                          return (
                           <tr key={i} className="tc-row">
                             <td style={{ padding:'14px 18px', verticalAlign:'middle', borderBottom:'1px solid #f8fafc', background:'inherit' }}>
                               <div style={{ fontWeight:700, color:'#1e293b', fontSize:13, letterSpacing:'-0.01em' }}>{row.tanggal||'—'}</div>
@@ -343,14 +381,23 @@ export default function TaxCoreDashboard() {
                                 {row[s.key] ? toIDR(row[s.key]) : '—'}
                               </td>
                             ))}
+                            <td style={{ padding:'14px 18px', textAlign:'right', verticalAlign:'middle', borderBottom:'1px solid #f8fafc', background:'inherit', whiteSpace:'nowrap' }}>
+                              {selisih !== 0 ? (
+                                <span style={{ display:'inline-flex', alignItems:'center', gap:4, padding:'3px 8px', borderRadius:6, fontSize:11, fontWeight:800, fontVariantNumeric:'tabular-nums', background: kurang ? '#fef2f2' : '#ecfdf5', color: kurang ? '#dc2626' : '#059669', border:`1px solid ${kurang ? '#fca5a5' : '#6ee7b7'}` }}>
+                                  {kurang ? <ArrowUpRight size={11}/> : <ArrowDownRight size={11}/>}
+                                  {toIDR(Math.abs(selisih))}
+                                </span>
+                              ) : <span style={{ color:'#e2e8f0' }}>—</span>}
+                            </td>
                             <td style={{ padding:'14px 18px', textAlign:'center', verticalAlign:'middle', borderBottom:'1px solid #f8fafc', background:'inherit' }}>
                               <PICBadge pic={row.pic}/>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                         {filteredData.length === 0 && (
                           <tr>
-                            <td colSpan={7} style={{ padding:'48px 0', textAlign:'center', color:'#94a3b8', fontSize:13, fontWeight:600 }}>
+                            <td colSpan={8} style={{ padding:'48px 0', textAlign:'center', color:'#94a3b8', fontSize:13, fontWeight:600 }}>
                               Tidak ada data yang cocok.
                             </td>
                           </tr>
@@ -426,6 +473,28 @@ function MobileCards({ data }) {
                 </div>
               </div>
             ))}
+            {/* Selisih PPN */}
+            {(() => {
+              const s = row.ppnK - row.ppnM;
+              const kurang = s > 0;
+              const color = kurang ? '#dc2626' : '#059669';
+              const dark  = kurang ? '#991b1b' : '#065f46';
+              const bg    = kurang ? 'linear-gradient(135deg,#fef2f2,#fecaca)' : 'linear-gradient(135deg,#ecfdf5,#a7f3d0)';
+              const border= kurang ? '#fca5a5' : '#6ee7b7';
+              return (
+                <div style={{ background: s !== 0 ? bg : '#f8fafc', borderRadius:10, padding:'10px 12px', border:`1px solid ${s !== 0 ? border : '#f1f5f9'}`, gridColumn:'span 2' }}>
+                  <div style={{ fontSize:9, fontWeight:800, color: s !== 0 ? dark : '#94a3b8', textTransform:'uppercase', letterSpacing:'.07em', marginBottom:4, opacity: s !== 0 ? .7 : 1 }}>
+                    {kurang ? 'Kurang Bayar' : s < 0 ? 'Lebih Bayar' : 'Selisih PPN'}
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+                    {s !== 0 && (kurang ? <ArrowUpRight size={12} color={color}/> : <ArrowDownRight size={12} color={color}/>)}
+                    <span style={{ fontSize:12, fontWeight:800, color: s !== 0 ? dark : '#cbd5e1', fontVariantNumeric:'tabular-nums', letterSpacing:'-0.01em' }}>
+                      {s !== 0 ? toIDRShort(Math.abs(s)) : '—'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       ))}
